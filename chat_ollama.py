@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("http").setLevel(logging.WARNING)
 
 logger.info("Starting the chatbot application...")
 
