@@ -13,10 +13,9 @@ A chatbot to talk about native plants in Texas
 
 ## To run the code locally using Ollama
 
-* Pull the model `tinyllama` using the command:
-
-`ollama pull tinyllama`
-
-* If you don't, the following code will pull that anyway:
+This chatbot uses `tinyllama` model to run the code. To run the chatbot, activate the environment, and
+run the following command on your shell:
 
 `python chat_ollama.py`
+
+It will wait for you to ask a question.
