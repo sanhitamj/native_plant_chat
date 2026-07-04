@@ -1,32 +1,37 @@
-from langchain_ollama import OllamaEmbeddings, OllamaLLM
-from langchain_chroma import Chroma
-from langchain.document_loaders import TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+import re
 
-# 1. Load and chunk your documents
-loader = TextLoader("native_plants.txt")
+from langchain_ollama import OllamaEmbeddings
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import DirectoryLoader, TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+NPSOT_DIR = "npsot"
+PERSIST_DIR = "./chroma_db"
+EMBED_MODEL = "nomic-embed-text"
+
+# Each npsot page starts with a markdown link to its source, e.g. "# [Title](https://npsot.org/...)"
+SOURCE_LINK_RE = re.compile(r"^#\s*\[.*?\]\((https?://[^)]+)\)")
+
+# 1. Load every markdown page scraped from npsot.org and chunk it
+loader = DirectoryLoader(NPSOT_DIR, glob="*.md", loader_cls=TextLoader)
 docs = loader.load()
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500,
-    chunk_overlap=50
-)
+
+for doc in docs:
+    match = SOURCE_LINK_RE.match(doc.page_content)
+    if match:
+        doc.metadata["source_url"] = match.group(1)
+
+splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 chunks = splitter.split_documents(docs)
 
-# 2. Embed and store in ChromaDB
-embeddings = OllamaEmbeddings(model="nomic-embed-text")
+# 2. Embed and persist to ChromaDB
+embeddings = OllamaEmbeddings(model=EMBED_MODEL)
 vectorstore = Chroma.from_documents(
     chunks,
     embeddings,
-    persist_directory="./chroma_db"
+    persist_directory=PERSIST_DIR,
 )
 
-# 3. Retrieve relevant chunks and pass to LLM
-retriever = vectorstore.as_retriever()
-query = "What plants attract monarch butterflies?"
-relevant_docs = retriever.invoke(query)
-context = "\n".join([d.page_content for d in relevant_docs])
-
-# 4. Generate response with context injected into prompt
-llm = OllamaLLM(model="tinyllama")
-response = llm.invoke(f"Context:\n{context}\n\nQuestion: {query}")
-
+if __name__ == "__main__":
+    print(f"Indexed {len(docs)} files from '{NPSOT_DIR}' into {len(chunks)} chunks.")
+    print(f"Vector store persisted to '{PERSIST_DIR}'.")
